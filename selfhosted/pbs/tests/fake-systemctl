@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+: "${SIGNUDOC_PBS_FAKE_STATE:?}"
+: "${SIGNUDOC_PBS_FAKE_LOG:?}"
+
+action="$1"
+shift
+if [[ "$action" == is-active ]]; then
+  [[ "$1" == --quiet ]] && shift
+  unit="$1"
+  printf 'is-active %s\n' "$unit" >>"$SIGNUDOC_PBS_FAKE_LOG"
+  if [[ "$unit" == signudoc-retention.service && -n "${SIGNUDOC_PBS_RETENTION_FINISH_AFTER_CHECKS:-}" ]]; then
+    count_file="$SIGNUDOC_PBS_FAKE_STATE/retention-check-count"
+    count=0
+    [[ ! -f "$count_file" ]] || count="$(<"$count_file")"
+    count=$((count + 1))
+    printf '%s\n' "$count" >"$count_file"
+    if (( count > SIGNUDOC_PBS_RETENTION_FINISH_AFTER_CHECKS )); then
+      sed -i "\|^${unit}$|d" "$SIGNUDOC_PBS_FAKE_STATE/active-units"
+      printf '%s\n' "${SIGNUDOC_PBS_FAKE_RETENTION_RESULT:-success}" \
+        >"$SIGNUDOC_PBS_FAKE_STATE/retention-result"
+      exit 3
+    fi
+  fi
+  if grep -Fxq "$unit" "$SIGNUDOC_PBS_FAKE_STATE/active-units"; then
+    exit 0
+  fi
+  exit 3
+fi
+
+if [[ "$action" == show ]]; then
+  property="$1"
+  shift
+  unit="${@: -1}"
+  printf 'show %s %s\n' "$property" "$unit" >>"$SIGNUDOC_PBS_FAKE_LOG"
+  case "$property" in
+    --property=ExecMainStartTimestampMonotonic)
+      if [[ -f "$SIGNUDOC_PBS_FAKE_STATE/retention-start" ]]; then
+        cat "$SIGNUDOC_PBS_FAKE_STATE/retention-start"
+      else
+        printf '0\n'
+      fi
+      ;;
+    --property=Result)
+      if [[ -f "$SIGNUDOC_PBS_FAKE_STATE/retention-result" ]]; then
+        cat "$SIGNUDOC_PBS_FAKE_STATE/retention-result"
+      else
+        printf 'success\n'
+      fi
+      ;;
+    *) exit 2 ;;
+  esac
+  exit 0
+fi
+
+if [[ "$action" == list-units ]]; then
+  printf 'list-units %s\n' "$*" >>"$SIGNUDOC_PBS_FAKE_LOG"
+  while IFS= read -r unit; do
+    [[ "$unit" =~ ^postgresql@[A-Za-z0-9_.-]+\.service$ ]] && printf '%s loaded active running Test PostgreSQL cluster\n' "$unit"
+  done <"$SIGNUDOC_PBS_FAKE_STATE/active-units"
+  exit 0
+fi
+
+if [[ "$action" == stop || "$action" == start ]]; then
+  unit="$1"
+  printf '%s %s\n' "$action" "$unit" >>"$SIGNUDOC_PBS_FAKE_LOG"
+  [[ "${SIGNUDOC_PBS_FAIL_ACTION:-}" != "$action:$unit" ]] || exit 1
+  if [[ "$action" == stop ]]; then
+    sed -i "\|^${unit}$|d" "$SIGNUDOC_PBS_FAKE_STATE/active-units"
+  elif ! grep -Fxq "$unit" "$SIGNUDOC_PBS_FAKE_STATE/active-units"; then
+    printf '%s\n' "$unit" >>"$SIGNUDOC_PBS_FAKE_STATE/active-units"
+  fi
+  exit 0
+fi
+
+printf 'unsupported fake systemctl action: %s\n' "$action" >&2
+exit 2

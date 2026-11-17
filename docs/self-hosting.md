@@ -293,9 +293,11 @@ Some data still leaves the EU: Vercel's and Resend's account metadata and logs, 
 
 Turn on the daily backup to a second Blob store, and learn the restore steps, in [Backup and restore](backup-and-restore.md).
 That procedure applies to the Vercel Blob setup. For Debian with local
-PostgreSQL and filesystem documents, use the backup requirements in the
-[Debian self-hosting guide](../selfhosted/README.md); backup automation and a
-verified restore are a Phase 3 prerequisite before production use.
+PostgreSQL and filesystem documents, use the [Debian PBS backup and recovery
+guide](../selfhosted/pbs/README.md). The Proxmox/PBS workflow and repository
+checks are not a school recovery drill: verify the existing VM job includes all
+SignuDoc disks and complete a restore onto an isolated Debian VM before
+production use.
 
 ## Daily cleanup
 

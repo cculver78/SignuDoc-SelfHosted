@@ -42,7 +42,9 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
   openssl \
   postgresql \
   postgresql-client \
+  python3 \
   python3-certbot-apache \
+  qemu-guest-agent \
   sudo \
   util-linux \
   xz-utils
@@ -94,4 +96,4 @@ install -d -o signudoc -g signudoc -m 0750 /var/lib/signudoc/documents
 install -d -o signudoc -g signudoc -m 0750 /var/cache/signudoc
 install -d -o signudoc-build -g signudoc-build -m 0750 /var/cache/signudoc-build /var/cache/signudoc-build/npm
 
-printf 'Prerequisites installed. No Apache site, database, environment file, or service was configured.\n'
+printf 'Prerequisites installed. No Proxmox VM setting, guest-agent hook, Apache site, database, environment file, or SignuDoc service was configured.\n'

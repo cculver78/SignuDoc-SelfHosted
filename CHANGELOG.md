@@ -8,6 +8,8 @@ release says when it does.
 
 ## [Unreleased]
 
+- Added Proxmox Backup Server VM backup integration, guest-agent quiescing, and
+  restore validation guidance for Debian self-hosting.
 - Added Debian self-hosting deployment examples for Apache, systemd, PostgreSQL,
   local document storage, SMTP, and operator-gated upgrades.
 - Added IPv4-only SMTP email delivery with TLS, optional authentication,

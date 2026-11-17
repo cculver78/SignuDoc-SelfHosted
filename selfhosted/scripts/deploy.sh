@@ -17,7 +17,7 @@ fail() {
 
 incomplete() {
   printf 'deploy: %s\n' "$1" >&2
-  printf 'The deployment marker is in place and the retention timer remains stopped. The application may still be running if failure happened before it was stopped. Review service, database, and release state before manual recovery; do not remove the marker until that review is complete.\n' >&2
+  printf 'The deployment marker is in place and the retention timer remains stopped. Review service, database, and release state before manual recovery; do not remove the marker until that review is complete.\n' >&2
   exit 1
 }
 
@@ -39,7 +39,7 @@ node_version="$("$NODE_BIN" --version)"
 if [[ "$node_version" != v24.* ]]; then
   fail "Node.js 24.x is required; found $node_version."
 fi
-for command_name in runuser systemctl systemd-run flock tar; do
+for command_name in runuser systemctl systemd-run tar; do
   command -v "$command_name" >/dev/null || fail "required command not found: $command_name."
 done
 id signudoc >/dev/null 2>&1 || fail 'the signudoc service account is missing; run install-prerequisites.sh first.'
@@ -97,14 +97,35 @@ chown -R root:signudoc "$build_dir"
 mv "$build_dir" "$release_dir"
 build_dir=
 
+if [[ ! -t 0 ]]; then
+  fail 'an interactive terminal is required for the PBS recovery-point checkpoint.'
+fi
+if ! "$repo_root/selfhosted/pbs/confirm-checkpoint.sh"; then
+  fail 'PBS recovery point was not confirmed; no database migration was run and services were not changed.'
+fi
+
 app_was_active=0
 timer_was_active=0
 systemctl is-active --quiet signudoc.service && app_was_active=1 || true
 systemctl is-active --quiet signudoc-retention.timer && timer_was_active=1 || true
 
-printf 'Pausing retention and the application for a consistent backup checkpoint...\n'
-systemctl stop signudoc-retention.timer || fail 'could not stop the retention timer; the current release is unchanged.'
-install -o root -g root -m 0600 /dev/null "$INCOMPLETE_MARKER"
+restore_previous_timer() {
+  if (( timer_was_active )) && ! systemctl start signudoc-retention.timer; then
+    install -o root -g root -m 0600 /dev/null "$INCOMPLETE_MARKER"
+    fail 'could not restore the retention timer; the deployment marker remains in place.'
+  fi
+}
+
+printf '\nPausing the SignuDoc retention schedule and waiting for any active retention job...\n'
+if ! systemctl stop signudoc-retention.timer; then
+  restore_previous_timer
+  fail 'could not stop the retention timer; the current release is unchanged.'
+fi
+if ! install -o root -g root -m 0600 /dev/null "$INCOMPLETE_MARKER"; then
+  restore_previous_timer
+  fail 'could not create the deployment marker; no database migration was run.'
+fi
+printf 'pre-migration PBS recovery point confirmed\n' >"$INCOMPLETE_MARKER"
 
 for ((attempt = 0; attempt < 360; attempt += 1)); do
   if ! systemctl is-active --quiet signudoc-retention.service; then
@@ -116,25 +137,7 @@ if systemctl is-active --quiet signudoc-retention.service; then
   incomplete 'retention did not finish within six minutes; review its journal before continuing.'
 fi
 
-systemctl stop signudoc.service || incomplete 'could not stop the application before the backup checkpoint.'
-
-if [[ ! -t 0 ]]; then
-  incomplete 'an interactive terminal is required for the backup checkpoint.'
-fi
-printf '\nThe application and retention timer are stopped. Take and verify your manual pre-deployment backup now.\n'
-printf 'When the database and document-store backup is complete, type BACKUP-DONE: '
-IFS= read -r checkpoint_answer
-if [[ "$checkpoint_answer" != BACKUP-DONE ]]; then
-  printf 'Checkpoint not confirmed; restoring the previously active services without running migrations.\n' >&2
-  rm -f "$INCOMPLETE_MARKER"
-  restore_failed=0
-  if (( app_was_active )) && ! systemctl start signudoc.service; then restore_failed=1; fi
-  if (( timer_was_active )) && ! systemctl start signudoc-retention.timer; then restore_failed=1; fi
-  if (( restore_failed )); then
-    fail 'backup checkpoint was not confirmed and a previously active service could not be restored; no database migration was run.'
-  fi
-  fail 'backup checkpoint was not confirmed; no database migration was run.'
-fi
+systemctl stop signudoc.service || incomplete 'could not stop the application before the database migration.'
 
 printf 'Applying pending database migrations as signudoc...\n'
 migration_unit="signudoc-migrate-$(date -u +%Y%m%d%H%M%S)"

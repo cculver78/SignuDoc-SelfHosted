@@ -6,7 +6,8 @@ systemd. It does not require Vercel, Neon, Blob, Resend, Docker, or hosted
 application services. It does not configure a school server by itself.
 
 This is deployment preparation, not a production approval. **Do not expose an
-installation to signers until Phase 3 backup and restore testing is complete.**
+installation to signers until a PBS backup has been verified and a restore
+drill has been completed.**
 The scripts here have not been run against a server. Replace every example with
 values for the intended VM before use.
 
@@ -42,7 +43,7 @@ sudo bash selfhosted/scripts/install-prerequisites.sh
 ```
 
 It installs Apache, PostgreSQL, Certbot, system tools, and the pinned Node.js
-24 release; creates the `signudoc` runtime user, separate `signudoc-build`
+24 release, Python 3, and QEMU Guest Agent; creates the `signudoc` runtime user, separate `signudoc-build`
 user, and isolated `signudoc-retention` user; and creates the storage, cache,
 and release directories. These accounts have `/usr/sbin/nologin`. It does not
 create a database, Apache site, environment file, certificate, or systemd
@@ -167,15 +168,43 @@ the school intentionally accepts the tradeoff of disabling it.
 
 ## Build and deploy
 
-Install the three systemd files and reload systemd before running the deployment
-script. On the checkout:
+For Debian, use the existing Proxmox Backup Server VM backup workflow. Review
+the [PBS backup and recovery guide](pbs/README.md) before exposing the service.
+PBS owns the schedule, verification, retention, and restore-point management;
+SignuDoc does not add a second backup repository, timer, or retention policy.
+
+Install the application and retention systemd files, install the guest-agent
+hook, and reload systemd before running the deployment script. The hook is
+called directly by QEMU Guest Agent, so inspect `/etc/qemu/qemu-ga.conf` and
+preserve any existing freeze hook when adding it. On the checkout:
 
 ```sh
 sudo install -o root -g root -m 0644 selfhosted/systemd/signudoc.service /etc/systemd/system/
 sudo install -o root -g root -m 0644 selfhosted/systemd/signudoc-retention.service /etc/systemd/system/
 sudo install -o root -g root -m 0644 selfhosted/systemd/signudoc-retention.timer /etc/systemd/system/
+sudo install -o root -g root -m 0750 selfhosted/pbs/signudoc-fsfreeze-hook.sh /usr/local/sbin/signudoc-pbs-fsfreeze-hook
+sudo install -o root -g root -m 0644 selfhosted/apache/signudoc-bootstrap.conf /etc/apache2/sites-available/signudoc.conf
+sudoedit /etc/apache2/sites-available/signudoc.conf
 sudo systemctl daemon-reload
 ```
+
+In `/etc/qemu/qemu-ga.conf`, add this setting in the existing `[general]`
+section (create the section if it is absent):
+
+```ini
+[general]
+fsfreeze-hook=/usr/local/sbin/signudoc-pbs-fsfreeze-hook
+```
+
+Do not overwrite another configured hook without preserving its behavior.
+Enable the QEMU Guest Agent option for this VM in Proxmox, then restart and
+check `qemu-guest-agent` in Debian. In a maintenance window, test a freeze/thaw
+cycle from the Proxmox host and inspect `journalctl -t signudoc-pbs-hook` in the
+guest. Do not use a backup as the first test of the hook.
+
+Replace `signudoc.example.com` in the installed bootstrap vhost before
+deployment. It serves only the ACME challenge directory and is not enabled by
+these commands.
 
 `scripts/deploy.sh` requires a clean, committed Git checkout, Node 24.x, the
 protected environment file, and the accounts/directories from the prerequisite
@@ -190,24 +219,33 @@ Run it from the repository root:
 sudo bash selfhosted/scripts/deploy.sh
 ```
 
-After the build, the script stops the retention timer, waits for an active
-retention run to finish, writes a root-owned incomplete-deployment marker, and
-stops the app. It then asks for the exact text `BACKUP-DONE`. Take and verify a
-consistent database plus document backup while both services are stopped.
-Without that exact confirmation no migration runs. If the checkpoint is
-declined, it removes the marker and restores only the services that were active
-beforehand.
+After the build, the script asks for the reference and UTC creation time of a
+recent successful PBS VM backup or other verified application-consistent
+recovery point. Check the Proxmox task log for successful freeze/thaw handling,
+confirm the required VM disks were included, check PBS verification status,
+and compare the point's age with the school's approved recovery-point
+objective. The script displays the age and requires the exact phrase
+`PBS-VERIFIED <reference> <UTC-time>`; a yes/no answer is not accepted. It
+cannot inspect or modify Proxmox jobs. Run deployments outside a PBS backup
+window and confirm no backup is in progress or will overlap the migration.
+Declining the checkpoint runs no migrations and does not pause services.
 
-After confirmation, the existing migration command runs as `signudoc` in a
+After confirmation, the script stops the retention timer, waits up to six
+minutes for an active retention job, writes a root-owned deployment marker,
+and stops the app. It does not pause or start PBS jobs. If stopping retention
+or the app fails, no migration runs; on later failures the marker remains for
+manual review.
+
+The existing migration command then runs as `signudoc` in a
 temporary systemd unit using the protected environment file. The script never
 runs `db:reset`. If migration fails, it leaves the app and timer stopped and
 the marker in place; some earlier migration files may already have committed.
 After migration succeeds it switches the release, starts the app, checks
-`http://127.0.0.1:3000/login`, then enables and starts the daily timer. A start
-or health-check failure also leaves the marker in place and stops the app. No
-database or code rollback is attempted automatically. Review the journal,
-database migration table, current symlink, backup, and retained releases before
-manual recovery.
+`http://127.0.0.1:3000/login`, then enables and starts the app and retention
+timer. A start or health-check failure leaves the marker in place and stops
+the app. No database or code rollback is attempted automatically. Review the
+journal, migration table, current symlink, confirmed recovery point, and
+retained releases before manual recovery.
 
 ## Apache and HTTPS
 
@@ -226,12 +264,13 @@ deliberately configured; this app's SMTP transport itself never tries IPv6.
 Do not put private network addresses or real school names in the checked-in
 examples.
 
-Enable only the required Apache modules and stage the HTTP challenge vhost:
+Before the first deployment, install the bootstrap vhost as described in Build
+and deploy. After the application deployment and public DNS are ready, enable
+the required Apache modules and HTTP challenge vhost:
 
 ```sh
 sudo a2enmod proxy proxy_http headers ssl rewrite
 sudo install -d -o root -g root -m 0755 /var/lib/letsencrypt/.well-known/acme-challenge
-sudo install -o root -g root -m 0644 selfhosted/apache/signudoc-bootstrap.conf /etc/apache2/sites-available/signudoc.conf
 sudo a2ensite signudoc.conf
 sudo apachectl configtest
 sudo systemctl reload apache2
@@ -250,6 +289,10 @@ install the final `selfhosted/apache/signudoc.conf` over
 `/etc/apache2/sites-available/signudoc.conf`, run `sudo apachectl configtest`,
 then reload Apache. Keep the ACME challenge alias available for renewal.
 Confirm Certbot's renewal timer is enabled and test renewal only on the VM.
+Because the final vhost and certificate were added after the pre-deployment
+checkpoint, schedule a consistent backup after this setup (and after later
+secret, Apache, systemd, or certificate changes) so the recovery snapshot
+contains the current host configuration.
 
 The TLS vhost proxies to `127.0.0.1:3000`, preserves the validated Host,
 sets the forwarded scheme to HTTPS, and uses a 300-second proxy timeout. It
@@ -351,31 +394,29 @@ Common checks:
 - **A deployment marker exists:** the previous deploy failed after pausing
   services or attempting migration. Do not delete it or restart units until an
   administrator has reviewed the DB migration table, current release, logs,
-  and pre-deploy backup.
+  and confirmed PBS recovery point.
 - **Sign-up fails on a password check:** allow outbound HTTPS to
   `api.pwnedpasswords.com`, or intentionally set `PASSWORD_BREACH_CHECK=off`
   after considering that password screening will be disabled.
 
-## Backup and restore preparation (Phase 3 gate)
+## Backup and restore
 
-For this local-storage architecture, recovery requires a PostgreSQL backup and
-the complete `/var/lib/signudoc/documents` tree. Preserve a matching
-`BETTER_AUTH_SECRET` and both protected environment files; include a
-customer-supplied P12 certificate and its password if configured. Preserve
-Let's Encrypt private keys or be prepared to reissue certificates. Treat all of
-this material as sensitive. The existing `docs/backup-and-restore.md` describes
-the Vercel Blob setup and is not a backup procedure for this local filesystem.
+See the [Debian PBS backup and recovery guide](pbs/README.md) for the
+application-consistent VM backup, verification, restore, and recovery
+checklist. The Vercel Blob procedure in
+[`docs/backup-and-restore.md`](../docs/backup-and-restore.md) applies only to
+hosted Blob installations.
 
-To make a consistent pre-deployment or recovery snapshot, stop the retention
-timer, wait for any retention service to finish, and stop the application
-before capturing both PostgreSQL and documents. The included deploy script
-automatically pauses the app and timer at its migration checkpoint. Database
-and files must represent the same point in time: a database reference without
-its PDF, or a PDF without its database row, can make a document unavailable or
-orphaned.
+The QEMU Guest Agent hook stops retention and SignuDoc, cleanly stops
+PostgreSQL, and then allows Proxmox to freeze the guest filesystems while it
+starts the VM snapshot. The Debian OS, PostgreSQL data and migration state,
+local document tree and sidecars, releases, protected settings and secrets,
+Apache/systemd configuration, certificates, and every included VM disk are
+protected by PBS together. PBS encryption keys, if used, must also be escrowed
+outside the VM.
 
-Phase 2 intentionally includes no backup automation and no restore procedure
-for this target. A backup that has not been restored into a clean test VM is
-not a demonstrated recovery plan. **Production use remains blocked until Phase
-3 implements and verifies backups, restore, and recovery of the secrets and
-document store.**
+No extra SignuDoc backup schedules remain; its daily retention timer is
+separate from PBS. This repository work is preparation, not proof of the
+school's actual backup or restore. Before signer access, verify the existing
+Proxmox job includes every required disk, check a successful application
+consistent task, and complete a restore drill on an isolated VM.
