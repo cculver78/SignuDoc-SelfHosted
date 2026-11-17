@@ -1,0 +1,49 @@
+[Unit]
+Description=SignuDoc web application
+Wants=network-online.target
+Requires=postgresql.service
+After=network-online.target postgresql.service
+
+[Service]
+Type=simple
+User=signudoc
+Group=signudoc
+WorkingDirectory=/opt/signudoc/current
+EnvironmentFile=/etc/signudoc/signudoc.env
+EnvironmentFile=/etc/signudoc/retention.env
+ExecStartPre=/usr/bin/test -L /opt/signudoc/current
+ExecStartPre=/usr/bin/test ! -e /var/lib/signudoc/deployment-incomplete
+ExecStart=/usr/local/bin/npm run start -- --hostname 127.0.0.1 --keepAliveTimeout 310000
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=90s
+TimeoutStopSec=45s
+KillSignal=SIGTERM
+KillMode=mixed
+UMask=0027
+
+CacheDirectory=signudoc
+CacheDirectoryMode=0750
+ReadWritePaths=/var/lib/signudoc/documents /var/cache/signudoc
+
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

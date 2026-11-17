@@ -292,6 +292,10 @@ Some data still leaves the EU: Vercel's and Resend's account metadata and logs, 
 ## Backups
 
 Turn on the daily backup to a second Blob store, and learn the restore steps, in [Backup and restore](backup-and-restore.md).
+That procedure applies to the Vercel Blob setup. For Debian with local
+PostgreSQL and filesystem documents, use the backup requirements in the
+[Debian self-hosting guide](../selfhosted/README.md); backup automation and a
+verified restore are a Phase 3 prerequisite before production use.
 
 ## Daily cleanup
 
@@ -303,6 +307,7 @@ Once a day the app deletes drafts nobody has touched for 30 days, finishes accou
 
 - **On Vercel** this is already scheduled: `vercel.json` has a cron job that calls it once a day. There is nothing to set up.
 - **Anywhere else**, have your own scheduler send it a `GET` or `POST` once a day.
+  The [Debian self-hosting guide](../selfhosted/README.md) uses a systemd timer.
 
 A new install has no secret for this route, so the route looks after itself: it runs at most once an hour, never twice at the same time, and answers with an empty response either way. Someone who finds the URL can only make the day's cleanup happen earlier.
 
@@ -329,7 +334,10 @@ It is opt-in for now because it has not yet been proven against a live Vercel de
 
 ## Self-hosting somewhere else
 
-SignuDoc is a regular Next.js app and runs anywhere Node.js 24 and Postgres do:
+SignuDoc is a regular Next.js app and runs anywhere Node.js 24 and Postgres do.
+For a Debian 13 VM with Apache, local PostgreSQL, local document storage,
+systemd, and SMTP, follow the [Debian self-hosting guide](../selfhosted/README.md).
+For other hosts, the basic production commands are:
 
 ```bash
 npm run db:migrate

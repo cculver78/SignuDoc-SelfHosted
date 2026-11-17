@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily SignuDoc retention and notification schedule
+
+[Timer]
+OnCalendar=*-*-* 08:15:00 UTC
+RandomizedDelaySec=5min
+AccuracySec=1min
+Persistent=true
+Unit=signudoc-retention.service
+
+[Install]
+WantedBy=timers.target
