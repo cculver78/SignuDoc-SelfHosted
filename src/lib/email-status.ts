@@ -7,6 +7,7 @@ import {
   isResendTestSender,
 } from "./services/email-addresses.ts";
 import { resolveEmailDriver } from "./services/email.ts";
+import { readSmtpConfig } from "./services/smtp-email.ts";
 import {
   getSettings,
   markEmailReady,
@@ -38,6 +39,16 @@ export type EmailDnsRecord = {
 export type EmailStatus =
   /** Development: messages are written to disk, not sent. */
   | { state: "capture" }
+  /** SMTP settings and a sender are present; a test send checks delivery. */
+  | {
+      state: "smtp_configured";
+      host: string;
+      port: number;
+      senderAddress: string;
+      verified: boolean;
+    }
+  /** SMTP settings or the sender address need correction. */
+  | { state: "smtp_error"; message: string }
   /**
    * No Resend API key, so nothing can be sent. On Vercel the steps to fix it
    * are Vercel's, which the page spells out.
@@ -379,13 +390,72 @@ async function inspectEmail({
   settings,
 }: EmailStatusOptions): Promise<Inspection> {
   const noop = async () => undefined;
+  const driver = resolveEmailDriver(env);
 
-  if (!domainsClient && resolveEmailDriver(env) === "capture") {
+  if (!domainsClient && driver === "capture") {
     return {
       client: null,
       domainId: null,
       markReady: noop,
       status: { state: "capture" },
+    };
+  }
+
+  if (!domainsClient && driver === "smtp") {
+    const smtp = readSmtpConfig(env);
+
+    if (smtp.config === null) {
+      return {
+        client: null,
+        domainId: null,
+        markReady: noop,
+        status: { message: smtp.error, state: "smtp_error" },
+      };
+    }
+
+    const resolvedSettings = settings ?? (await getSettings(env));
+
+    if (!resolvedSettings.senderAddress?.trim()) {
+      return {
+        client: null,
+        domainId: null,
+        markReady: noop,
+        status: {
+          message:
+            "Set a sender address under Settings, Organization or configure SMTP_FROM_EMAIL or EMAIL_FROM_ADDRESS.",
+          state: "smtp_error",
+        },
+      };
+    }
+
+    const senderAddress = extractEmailAddress(
+      buildEmailAddresses(resolvedSettings).senderAddress,
+    );
+
+    if (!getAddressDomain(senderAddress)) {
+      return {
+        client: null,
+        domainId: null,
+        markReady: noop,
+        status: {
+          message:
+            "The configured sender address is not a valid email address.",
+          state: "smtp_error",
+        },
+      };
+    }
+
+    return {
+      client: null,
+      domainId: null,
+      markReady: noop,
+      status: {
+        host: smtp.config.host,
+        port: smtp.config.port,
+        senderAddress,
+        state: "smtp_configured",
+        verified: resolvedSettings.emailReadyAt !== null,
+      },
     };
   }
 
@@ -557,8 +627,23 @@ export function emailNeedsAttention(
   env: EnvSource = process.env,
 ): boolean {
   try {
-    if (resolveEmailDriver(env) === "capture") {
+    const driver = resolveEmailDriver(env);
+
+    if (driver === "capture") {
       return false;
+    }
+
+    if (driver === "smtp") {
+      const smtp = readSmtpConfig(env);
+
+      return (
+        smtp.error !== null ||
+        !settings.senderAddress?.trim() ||
+        !getAddressDomain(
+          extractEmailAddress(buildEmailAddresses(settings).senderAddress),
+        ) ||
+        settings.emailReadyAt === null
+      );
     }
   } catch {
     return true;

@@ -17,7 +17,8 @@ import { getEnv, isHostedMode, type EnvSource } from "./utils/env.ts";
 // Install-wide settings: one row in app_settings, written by the first-run
 // setup page and by an administrator in Settings.
 //
-// Environment variables win over the row (RESEND_FROM_EMAIL, SUPPORT_EMAIL),
+// Environment variables win over the row (EMAIL_FROM_ADDRESS,
+// SMTP_FROM_EMAIL, RESEND_FROM_EMAIL, SUPPORT_EMAIL),
 // so a deployment that was configured that way before settings existed keeps
 // working without anyone touching it.
 

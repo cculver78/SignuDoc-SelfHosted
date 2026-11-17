@@ -148,6 +148,52 @@ test("the capture driver is reported as such without asking anyone", async () =>
   });
 });
 
+test("SMTP status reports configured settings without contacting a mail server", async () => {
+  const smtpEnv = {
+    EMAIL_DRIVER: "smtp",
+    SMTP_HOST: "mail.acme.com",
+    SMTP_PORT: "587",
+  };
+
+  assert.deepEqual(
+    await getEmailStatus({
+      env: smtpEnv,
+      settings: resolveSettings(stored, smtpEnv),
+    }),
+    {
+      host: "mail.acme.com",
+      port: 587,
+      senderAddress: "sign@acme.com",
+      state: "smtp_configured",
+      verified: false,
+    },
+  );
+});
+
+test("SMTP status reports missing configuration and missing sender addresses", async () => {
+  assert.deepEqual(await getEmailStatus({ env: { EMAIL_DRIVER: "smtp" } }), {
+    message: "Set SMTP_HOST to your mail server.",
+    state: "smtp_error",
+  });
+
+  const smtpEnv = {
+    EMAIL_DRIVER: "smtp",
+    SMTP_HOST: "mail.acme.com",
+  };
+
+  assert.deepEqual(
+    await getEmailStatus({
+      env: smtpEnv,
+      settings: resolveSettings({ ...stored, senderAddress: null }, smtpEnv),
+    }),
+    {
+      message:
+        "Set a sender address under Settings, Organization or configure SMTP_FROM_EMAIL or EMAIL_FROM_ADDRESS.",
+      state: "smtp_error",
+    },
+  );
+});
+
 test("no Resend key means email is not connected", async () => {
   assert.deepEqual(await getEmailStatus({ env: {}, settings }), {
     onVercel: false,
@@ -557,6 +603,23 @@ test("the administrator is told about email until it has been seen working", () 
     emailNeedsAttention(settings, { EMAIL_DRIVER: "capture" }),
     false,
   );
+
+  const smtpEnv = {
+    EMAIL_DRIVER: "smtp",
+    SMTP_HOST: "mail.acme.com",
+  };
+  assert.equal(
+    emailNeedsAttention(resolveSettings(stored, smtpEnv), smtpEnv),
+    true,
+  );
+  assert.equal(
+    emailNeedsAttention(
+      resolveSettings({ ...stored, emailReadyAt: 1_800_000_100 }, smtpEnv),
+      smtpEnv,
+    ),
+    false,
+  );
+  assert.equal(emailNeedsAttention(settings, { EMAIL_DRIVER: "smtp" }), true);
 });
 
 test("RESEND_REGION picks a known Resend region and ignores anything else", () => {

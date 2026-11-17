@@ -133,6 +133,8 @@ A deployment made with the button needs no environment variables. These are ther
 | `CRON_SECRET`                                       | Closes the daily cleanup route to everyone but Vercel's own cron call. See [Daily cleanup](#daily-cleanup).                                                                                            |
 | `BOTID`                                             | `1` turns on Vercel BotID for sign-in, sign-up and setup. See [Bot protection](#bot-protection).                                                                                                       |
 | `RESEND_FROM_EMAIL`, `SUPPORT_EMAIL`                | Fix the sender and support addresses from the environment instead of in Settings.                                                                                                                      |
+| `EMAIL_DRIVER`, `SMTP_*`                            | Send through an SMTP server instead of Resend. See [Self-hosting somewhere else](#self-hosting-somewhere-else).                                                                                        |
+| `EMAIL_FROM_ADDRESS`                                | Fix the sender address from the environment for either email provider.                                                                                                                                 |
 | `BETTER_AUTH_SECRET`                                | Your own secret for signing sessions. Without it one is derived from the database password, so changing that password signs everyone out.                                                              |
 | `APP_URL`                                           | The site's public address, if it should not be the project's production domain.                                                                                                                        |
 | `HOSTED_MODE`                                       | `1` runs SignuDoc as a public service under its own name. See [Hosted mode](#hosted-mode).                                                                                                             |
@@ -153,7 +155,7 @@ The first time you open a new install it takes you to `/setup`. There you name y
 
 - **Who can sign up.** The install starts by letting people with an email address at the administrator's own domain create accounts (or nobody else, if the administrator used a public mailbox such as Gmail). The administrator can change this under Settings, Organization: people at listed domains, nobody, or anyone. People who are only sent a document to sign never need an account.
 - **More administrators.** Settings, Organization lists everyone with an account under People, where an administrator can make someone else an administrator or take that away. There is always at least one. When an account is closed, its finished documents and their audit trails move to the longest-standing administrator, because they are the organization's records. If that person later stops being an administrator, those documents move on to one who stays, and the documents they sent themselves stay with them.
-- **Email.** Settings, Organization also shows whether email is working. While no sender address is set, mail goes out from Resend's test address, which only reaches the owner of the Resend account. Enter a sender address at your domain and the page shows the DNS records to add and checks them for you. Mail from that address is not delivered until its domain is verified.
+- **Email.** Settings, Organization also shows whether email is working. With Resend, mail uses Resend's test address until you set a sender address, then the page shows the DNS records to verify. With SMTP, set the server and sender address in the environment or Organization settings, then send a test email to check delivery.
 - **`SETUP_TOKEN`.** A new install can be claimed by whoever opens it first. If its URL will be public before you get to it, set `SETUP_TOKEN` to a secret of your own and the setup page will ask for it.
 - **An install from before this page existed** has accounts but no administrator. Set `SETUP_TOKEN`, sign in with the account that should be in charge, and open `/setup`. It asks for a support address if the install has none. Sign-up stays open, as it was, until that administrator changes it.
 
@@ -340,9 +342,12 @@ Away from Vercel, a few things Vercel does for you are yours to set:
 - `DATABASE_URL`, pointing at your Postgres. Run `npm run db:migrate` on every deploy; it only applies what is new.
 - `APP_URL`, the site's public HTTPS address.
 - `BETTER_AUTH_SECRET`, at least 32 characters (`openssl rand -hex 32`). Without it a secret is derived from the database password, which must then be at least 12 characters long.
-- `RESEND_API_KEY`, from your Resend account.
+- An email provider: leave `EMAIL_DRIVER` unset and set `RESEND_API_KEY` to use Resend, or set `EMAIL_DRIVER=smtp` and configure `SMTP_HOST` to use an SMTP server.
+- For SMTP, port 587 uses STARTTLS by default and port 465 uses implicit TLS by default. Hostnames are resolved through IPv4 only, and IPv6-only servers are unsupported. Set `SMTP_USER` and `SMTP_PASSWORD` together if the server requires authentication. TLS certificate validation stays enabled.
+- Set the sender address in Settings, Organization, or use `SMTP_FROM_EMAIL` for SMTP, `RESEND_FROM_EMAIL` for Resend, or `EMAIL_FROM_ADDRESS` for either provider. The support address remains the default reply-to address.
 - Files are kept on the machine's disk under `.data/storage` (`STORAGE_LOCAL_DIR` changes where), so that disk must survive restarts. To use a Vercel Blob store from elsewhere, set `BLOB_READ_WRITE_TOKEN`.
-- Leave `EMAIL_DRIVER` unset. The capture driver is for development only.
+
+SMTP delivery uses the server's accepted/rejected response and does not provide Resend's provider-side idempotency handling. If a job is retried after an uncertain delivery, a duplicate email may be sent.
 
 Self-hosted operators are responsible for:
 

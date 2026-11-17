@@ -57,6 +57,31 @@ test("email addresses set in the environment win over the stored ones", () => {
   assert.equal(settings.supportAddressFromEnv, true);
 });
 
+test("SMTP and generic sender overrides apply only to the selected driver", () => {
+  assert.equal(
+    resolveSettings(stored, {
+      EMAIL_DRIVER: "smtp",
+      SMTP_FROM_EMAIL: "mail@relay.acme.com",
+    }).senderAddress,
+    "mail@relay.acme.com",
+  );
+  assert.equal(
+    resolveSettings(stored, {
+      EMAIL_DRIVER: "smtp",
+      EMAIL_FROM_ADDRESS: "mail@acme.com",
+      SMTP_FROM_EMAIL: "other@acme.com",
+    }).senderAddress,
+    "mail@acme.com",
+  );
+  assert.equal(
+    resolveSettings(stored, {
+      EMAIL_DRIVER: "resend",
+      SMTP_FROM_EMAIL: "mail@relay.acme.com",
+    }).senderAddress,
+    "sign@acme.com",
+  );
+});
+
 test("hosted mode is switched on by HOSTED_MODE", () => {
   assert.equal(resolveSettings(null, { HOSTED_MODE: "1" }).hosted, true);
   assert.equal(resolveSettings(null, { HOSTED_MODE: "true" }).hosted, true);

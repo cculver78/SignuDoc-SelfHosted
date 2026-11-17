@@ -1,6 +1,7 @@
 import { isResendTestSender } from "./services/email-addresses.ts";
 import {
   createEmailService,
+  resolveEmailDriver,
   resolveEmailAddresses,
   type EmailService,
 } from "./services/email.ts";
@@ -65,7 +66,12 @@ export async function sendTestEmail({
     // address's domain is verified, even when the API key is not allowed to
     // say so. The shared test address proves nothing: it only ever reaches
     // the owner of the Resend account.
-    if (!isResendTestSender(testedSender)) {
+    const driver = resolveEmailDriver(env);
+
+    if (
+      driver !== "capture" &&
+      (driver === "smtp" || !isResendTestSender(testedSender))
+    ) {
       await markEmailReady(true, testedSettings);
     }
 

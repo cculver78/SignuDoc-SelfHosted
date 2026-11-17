@@ -8,6 +8,9 @@ release says when it does.
 
 ## [Unreleased]
 
+- Added IPv4-only SMTP email delivery with TLS, optional authentication,
+  sender overrides, and admin test-send support; Resend remains supported.
+
 ## [0.3.0] - 2026-11-16
 
 Sign-in security and audit features for organizations that need them, and

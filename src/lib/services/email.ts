@@ -9,16 +9,18 @@ import { type EmailTemplateKind } from "../types/domain.ts";
 import { getEnv, isLocalDeployment, type EnvSource } from "../utils/env.ts";
 import { buildEmailAddresses, type EmailAddresses } from "./email-addresses.ts";
 import { assertServiceConfig } from "./service-config.ts";
+import { createSmtpEmailService, type SmtpTransport } from "./smtp-email.ts";
 
 // The addresses mail is sent from and replied to are not needed here: they
-// come from RESEND_FROM_EMAIL and SUPPORT_EMAIL when those are set, and from
-// the install's settings otherwise, and are looked up when a message is sent.
+// come from the provider's sender override (or EMAIL_FROM_ADDRESS) and
+// SUPPORT_EMAIL when set, and from the install's settings otherwise. They are
+// looked up when a message is sent.
 const EMAIL_ENV_KEYS = ["RESEND_API_KEY"] as const;
 
 const DEFAULT_CAPTURE_DIR = ".data/outbox";
 const DEFAULT_CAPTURE_SENDER_ADDRESS = "dev@signudoc.localhost";
 
-export type EmailDriver = "capture" | "resend";
+export type EmailDriver = "capture" | "resend" | "smtp";
 
 export type EmailAttachment = {
   content: Uint8Array;
@@ -68,6 +70,8 @@ type CreateEmailServiceOptions = {
   /** Replaced in tests, where there is no database to read settings from. */
   resolveAddresses?: () => Promise<EmailAddresses>;
   resendClient?: Resend;
+  /** Replaced in tests, so SMTP messages never contact a real mail server. */
+  smtpTransport?: SmtpTransport;
   /** Replaced in tests, so that they do not really wait. */
   wait?: (milliseconds: number) => Promise<void>;
 };
@@ -189,12 +193,16 @@ export function resolveEmailDriver(env: EnvSource = process.env): EmailDriver {
     return "resend";
   }
 
-  if (configuredDriver === "capture" || configuredDriver === "resend") {
+  if (
+    configuredDriver === "capture" ||
+    configuredDriver === "resend" ||
+    configuredDriver === "smtp"
+  ) {
     return configuredDriver;
   }
 
   throw new Error(
-    `Unknown EMAIL_DRIVER "${configuredDriver}". Use "resend" or "capture".`,
+    `Unknown EMAIL_DRIVER "${configuredDriver}". Use "resend", "smtp", or "capture".`,
   );
 }
 
@@ -300,13 +308,20 @@ export function createEmailService({
   env = process.env,
   resolveAddresses = () => resolveEmailAddresses(env),
   resendClient,
+  smtpTransport,
   wait = waitFor,
 }: CreateEmailServiceOptions = {}): EmailService {
-  if (!resendClient && resolveEmailDriver(env) === "capture") {
+  const driver = resolveEmailDriver(env);
+
+  if (!resendClient && driver === "capture") {
     return createCaptureEmailService(env, resolveAddresses);
   }
 
-  if (!resendClient) {
+  if (!resendClient && driver === "smtp") {
+    return createSmtpEmailService({ env, resolveAddresses, smtpTransport });
+  }
+
+  if (!resendClient && driver === "resend") {
     assertServiceConfig("email", EMAIL_ENV_KEYS, env);
   }
 

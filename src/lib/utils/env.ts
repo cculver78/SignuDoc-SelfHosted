@@ -263,6 +263,8 @@ export function isHostedMode(env: EnvSource = process.env): boolean {
 // use (see requireConfigValue), so a missing email setting cannot stop a page
 // that never sends email from rendering.
 export function getEnv(env: EnvSource = process.env) {
+  const emailDriver = readEnv(env, "EMAIL_DRIVER")?.toLowerCase();
+
   return {
     databaseUrl: resolveDatabaseUrl(env),
     appUrl: resolveAppUrl(env),
@@ -272,7 +274,11 @@ export function getEnv(env: EnvSource = process.env) {
     },
     email: {
       apiKey: readEnv(env, "RESEND_API_KEY"),
-      senderAddress: readEnv(env, "RESEND_FROM_EMAIL"),
+      senderAddress:
+        readEnv(env, "EMAIL_FROM_ADDRESS") ??
+        (emailDriver === "smtp"
+          ? readEnv(env, "SMTP_FROM_EMAIL")
+          : readEnv(env, "RESEND_FROM_EMAIL")),
       supportAddress: readEnv(env, "SUPPORT_EMAIL"),
     },
     internal: {

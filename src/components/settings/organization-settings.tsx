@@ -506,6 +506,7 @@ function EmailSetupPanel() {
   const canSendTest =
     status !== null &&
     status.state !== "missing_key" &&
+    status.state !== "smtp_error" &&
     status.state !== "capture";
 
   return (
@@ -641,6 +642,21 @@ function describeEmailStatus(status: EmailStatus): {
         ],
         ready: true,
         title: "Emails are being captured, not sent",
+      };
+    case "smtp_configured":
+      return {
+        lines: [
+          `SMTP is configured at ${status.host}:${String(status.port)}. ${status.verified ? "Email has a successful test on record; send another test after changing SMTP settings." : "Send a test email to check delivery."}`,
+          `Messages are sent from ${status.senderAddress}.`,
+        ],
+        ready: status.verified,
+        title: status.verified ? "Email is working" : "Check SMTP delivery",
+      };
+    case "smtp_error":
+      return {
+        lines: [status.message],
+        ready: false,
+        title: "SMTP email is not configured",
       };
     case "missing_key":
       return status.onVercel
