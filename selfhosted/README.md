@@ -210,8 +210,10 @@ these commands.
 protected environment file, and the accounts/directories from the prerequisite
 script. It archives `HEAD`, installs from `package-lock.json`, and builds as
 `signudoc-build`, not root. It keeps releases under `/opt/signudoc/releases`
-and switches `/opt/signudoc/current` only after a controlled database
-migration.
+with traversal access for the build account; completed releases remain
+restricted to root and the `signudoc` group. Deployment repairs the parent
+directory permissions from older installations before building. It switches
+`/opt/signudoc/current` only after a controlled database migration.
 
 Run it from the repository root:
 

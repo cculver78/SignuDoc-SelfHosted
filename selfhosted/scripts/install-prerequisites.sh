@@ -90,7 +90,7 @@ if ! getent passwd signudoc-retention >/dev/null; then
 fi
 
 install -d -o root -g root -m 0700 /etc/signudoc
-install -d -o root -g signudoc -m 0750 /opt/signudoc /opt/signudoc/releases
+install -d -o root -g signudoc -m 0751 /opt/signudoc /opt/signudoc/releases
 install -d -o root -g signudoc -m 0750 /var/lib/signudoc
 install -d -o signudoc -g signudoc -m 0750 /var/lib/signudoc/documents
 install -d -o signudoc -g signudoc -m 0750 /var/cache/signudoc

@@ -60,7 +60,7 @@ if [[ ! -L "$CURRENT_LINK" ]]; then
   unset setup_token
 fi
 
-mkdir -p "$RELEASES_DIR"
+install -d -o root -g signudoc -m 0751 "$APP_ROOT" "$RELEASES_DIR"
 build_dir="$(mktemp -d "$RELEASES_DIR/.build.XXXXXX")"
 cleanup_build() {
   if [[ -n "${build_dir:-}" && -d "$build_dir" ]]; then

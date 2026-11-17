@@ -1,5 +1,6 @@
 # Changelog
 
+- Fixed build account traversal of the deployment release directories.
 - Added Proxmox Backup Server VM backup integration, guest-agent quiescing, and
   Debian restore validation guidance.
 - Added Debian self-hosting deployment examples and safe operator-gated upgrades.
