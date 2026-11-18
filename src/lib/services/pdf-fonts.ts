@@ -20,32 +20,30 @@ import type { Color, PDFDocument, PDFFont, PDFPage } from "pdf-lib";
 // Not handled: right-to-left scripts (Arabic, Hebrew) and scripts that need
 // glyph shaping (Thai, the Indic scripts). Those draw as "\uFFFD".
 
-// Each path is spelled out so that Next.js file tracing copies the file into
-// the deployed function.
-const FONT_PATHS = {
-  bold: path.join(process.cwd(), "src", "assets", "fonts", "NotoSans-Bold.ttf"),
-  cjk: path.join(
-    process.cwd(),
-    "src",
-    "assets",
-    "fonts",
-    "NotoSansCJKjp-Regular.ttf",
-  ),
-  regular: path.join(
-    process.cwd(),
-    "src",
-    "assets",
-    "fonts",
-    "NotoSans-Regular.ttf",
-  ),
-  signature: path.join(
-    process.cwd(),
-    "src",
-    "assets",
-    "fonts",
-    "GreatVibes-Regular.ttf",
-  ),
-} as const;
+type FontName = "bold" | "cjk" | "regular" | "signature";
+
+// Keep each read statically analyzable so the server trace contains only
+// these assets. The service working directory is the release root.
+function readFont(name: FontName): Promise<Buffer> {
+  switch (name) {
+    case "bold":
+      return fs.readFile(
+        path.join(process.cwd(), "src/assets/fonts/NotoSans-Bold.ttf"),
+      );
+    case "cjk":
+      return fs.readFile(
+        path.join(process.cwd(), "src/assets/fonts/NotoSansCJKjp-Regular.ttf"),
+      );
+    case "regular":
+      return fs.readFile(
+        path.join(process.cwd(), "src/assets/fonts/NotoSans-Regular.ttf"),
+      );
+    case "signature":
+      return fs.readFile(
+        path.join(process.cwd(), "src/assets/fonts/GreatVibes-Regular.ttf"),
+      );
+  }
+}
 
 const SUBSETTER_PATH = path.join(
   process.cwd(),
@@ -54,8 +52,6 @@ const SUBSETTER_PATH = path.join(
   "dist",
   "harfbuzz-subset.wasm",
 );
-
-type FontName = keyof typeof FONT_PATHS;
 
 type LoadedFont = {
   bytes: Uint8Array;
@@ -68,7 +64,7 @@ function loadFont(name: FontName): Promise<LoadedFont> {
   let loaded = loadedFonts.get(name);
 
   if (!loaded) {
-    loaded = fs.readFile(FONT_PATHS[name]).then((buffer) => {
+    loaded = readFont(name).then((buffer) => {
       const bytes = new Uint8Array(buffer);
 
       return {

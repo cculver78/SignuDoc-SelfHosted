@@ -27,3 +27,6 @@ playwright-report/
 # Claude Code
 .claude/
 
+# Generated production releases
+/releases/
+

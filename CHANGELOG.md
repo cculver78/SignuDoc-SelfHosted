@@ -8,6 +8,8 @@ release says when it does.
 
 ## [Unreleased]
 
+- Ignore generated production release directories in the checkout.
+- Restricted PDF font tracing to the required assets.
 - Fixed build account traversal of the deployment release directories.
 - Added Proxmox Backup Server VM backup integration, guest-agent quiescing, and
   restore validation guidance for Debian self-hosting.

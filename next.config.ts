@@ -26,7 +26,10 @@ const nextConfig: NextConfig = {
   // files here makes sure they are copied into the deployed functions.
   outputFileTracingIncludes: {
     "/api/**": [
-      "./src/assets/fonts/*.ttf",
+      "./src/assets/fonts/NotoSans-Bold.ttf",
+      "./src/assets/fonts/NotoSansCJKjp-Regular.ttf",
+      "./src/assets/fonts/NotoSans-Regular.ttf",
+      "./src/assets/fonts/GreatVibes-Regular.ttf",
       "./node_modules/harfbuzzjs/dist/harfbuzz-subset.wasm",
     ],
   },

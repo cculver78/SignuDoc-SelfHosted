@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { cp, mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { PDFDocument } from "pdf-lib";
 
@@ -93,6 +98,55 @@ test("text outside Windows-1252 is drawn and can be read back", async () => {
     pdfBytes.byteLength < 700_000,
     `PDF is ${String(pdfBytes.byteLength)} bytes`,
   );
+});
+
+test("fonts work from a symlinked release working directory", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "signudoc-font-release-"));
+  const release = path.join(root, "releases", "release-1");
+  const current = path.join(root, "current");
+  const project = process.cwd();
+
+  try {
+    await mkdir(path.join(release, "src", "assets"), { recursive: true });
+    await cp(
+      path.join(project, "src", "assets", "fonts"),
+      path.join(release, "src", "assets", "fonts"),
+      { recursive: true },
+    );
+    await mkdir(path.join(release, "node_modules", "harfbuzzjs", "dist"), {
+      recursive: true,
+    });
+    await cp(
+      path.join(
+        project,
+        "node_modules",
+        "harfbuzzjs",
+        "dist",
+        "harfbuzz-subset.wasm",
+      ),
+      path.join(
+        release,
+        "node_modules",
+        "harfbuzzjs",
+        "dist",
+        "harfbuzz-subset.wasm",
+      ),
+    );
+    await symlink(release, current);
+    const result = spawnSync(
+      process.execPath,
+      [
+        "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON",
+        "--test",
+        "--test-name-pattern=^text outside Windows-1252",
+        fileURLToPath(import.meta.url),
+      ],
+      { cwd: current, encoding: "utf8" },
+    );
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("a mixed line is split into runs, one per font", async () => {
