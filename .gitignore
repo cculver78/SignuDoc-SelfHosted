@@ -29,4 +29,5 @@ playwright-report/
 
 # Generated production releases
 /releases/
+/current
 

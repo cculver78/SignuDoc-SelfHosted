@@ -1,5 +1,7 @@
 # Changelog
 
+- Ignore the generated active-release symlink so later deployments pass the
+  checkout cleanliness check.
 - Integrated upstream SignuDoc v0.4.0 while preserving the self-hosted SMTP,
   deployment, local storage, retention, and PBS behavior; documented the
   repeatable upstream upgrade and review process.
