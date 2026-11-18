@@ -1,0 +1,28 @@
+SignuDoc database schema notes
+==============================
+
+The authoritative schema is the ordered set of SQL migrations in
+db/migrations/. Apply migrations with `npm run db:migrate`; do not rebuild a
+deployed database to upgrade its schema.
+
+Upstream v0.4.0 — name field
+---------------------------
+
+PostgreSQL 17 migration (also stored in
+db/migrations/20261118090000_name_field.sql):
+
+ALTER TABLE public.fields
+  DROP CONSTRAINT IF EXISTS fields_type_check;
+
+ALTER TABLE public.fields
+  ADD CONSTRAINT fields_type_check CHECK (
+    type IN (
+      'signature', 'initials', 'date', 'name', 'text', 'checkbox',
+      'number', 'dropdown', 'radio'
+    )
+  );
+
+This widens the allowed values of fields.type to include `name`. It changes no
+columns and transforms no existing rows. The PostgreSQL `pg` driver is the
+only database engine supported by the current migration runner. SQL Server
+and SQLite are not supported, so no migrations for those engines apply.

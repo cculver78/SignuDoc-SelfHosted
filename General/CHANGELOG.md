@@ -1,5 +1,8 @@
 # Changelog
 
+- Integrated upstream SignuDoc v0.4.0 while preserving the self-hosted SMTP,
+  deployment, local storage, retention, and PBS behavior; documented the
+  repeatable upstream upgrade and review process.
 - Fixed release directory listing and checkout ownership for Debian builds.
 - Ignore generated production release directories in the checkout.
 - Restricted PDF font tracing to the required assets.

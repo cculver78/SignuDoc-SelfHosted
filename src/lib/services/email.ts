@@ -8,7 +8,10 @@ import { getSettings } from "../settings.ts";
 import { type EmailTemplateKind } from "../types/domain.ts";
 import { getEnv, isLocalDeployment, type EnvSource } from "../utils/env.ts";
 import { buildEmailAddresses, type EmailAddresses } from "./email-addresses.ts";
-import { assertServiceConfig } from "./service-config.ts";
+import {
+  assertServiceConfig,
+  ServiceConfigurationError,
+} from "./service-config.ts";
 import { createSmtpEmailService, type SmtpTransport } from "./smtp-email.ts";
 
 // The addresses mail is sent from and replied to are not needed here: they
@@ -302,6 +305,21 @@ export async function resolveEmailAddresses(
   return resolveEmailDriver(env) === "capture"
     ? buildEmailAddresses(settings, DEFAULT_CAPTURE_SENDER_ADDRESS)
     : buildEmailAddresses(settings);
+}
+
+/** What a sender is told when an action needs email and none is connected. */
+export const EMAIL_NOT_CONNECTED_MESSAGE =
+  "Email is not set up yet, so signers can't be emailed. An administrator can finish email setup in Settings, Organization.";
+
+/**
+ * Whether an error is createEmailService's refusal for a missing provider
+ * key: a known setup state, not a server failure (issue #53).
+ */
+export function isEmailNotConnectedError(error: unknown): boolean {
+  return (
+    error instanceof ServiceConfigurationError &&
+    error.message.startsWith("email service ")
+  );
 }
 
 export function createEmailService({

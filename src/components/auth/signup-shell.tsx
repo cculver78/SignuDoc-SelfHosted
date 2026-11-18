@@ -11,6 +11,11 @@ import {
 import { SsoButton, type SsoOption } from "@/components/auth/sso-button";
 import { FieldShell, ShellButton } from "@/components/shared/form-shell";
 import { authClient } from "@/lib/auth/client";
+import {
+  describePasswordRefusal,
+  newPasswordLengthError,
+  PASSWORD_TOO_SHORT_MESSAGE,
+} from "@/lib/password-messages";
 import { signUpSchema } from "@/lib/schemas/auth";
 
 const defaultSuccessMessage = "Check your email to verify your sender account.";
@@ -380,7 +385,9 @@ function LiveSignupShell({
         }
 
         if (field === "password") {
-          nextErrors.password = "Password must be at least 15 characters";
+          nextErrors.password =
+            newPasswordLengthError(trimmedValues.password) ??
+            PASSWORD_TOO_SHORT_MESSAGE;
         }
       }
 
@@ -420,13 +427,9 @@ function LiveSignupShell({
         setErrors({
           email: "This email is already registered",
         });
-      } else if (normalizedErrorMessage.includes("password too short")) {
+      } else if (describePasswordRefusal(result.error)) {
         setErrors({
-          password: "Password must be at least 15 characters",
-        });
-      } else if (normalizedErrorMessage.includes("compromised")) {
-        setErrors({
-          password: "Choose a password that hasn't appeared in a breach",
+          password: describePasswordRefusal(result.error)!,
         });
       } else {
         setBannerMessage("Something went wrong. Please try again.");
