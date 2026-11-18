@@ -374,6 +374,28 @@ reminder, and expiration logic.
 
 ## Upgrades and troubleshooting
 
+To pull the checkout's configured upstream branch as the checkout owner, run
+from the checkout directory:
+
+```sh
+sudo -u signudoc-deploy bash selfhosted/scripts/pull-updates.sh
+```
+
+The pull requires a clean checkout and a fast-forward update. It updates the
+checkout only; it does not build or activate a release. After pulling, review
+the changes and follow the deployment procedure below.
+
+To restart SignuDoc and Apache and check the local SignuDoc login endpoint:
+
+```sh
+sudo bash selfhosted/scripts/restart-services.sh
+```
+
+This restarts Apache for all sites it serves. It leaves PostgreSQL and the
+retention timer alone and refuses to run while retention is active or a
+deployment is marked incomplete. Restarting does not activate a newly pulled
+checkout; the current deployed release continues to run.
+
 Commit the desired version, update the checkout on the VM through the school's
 approved source-control process, confirm it is clean, and run the same
 `deploy.sh`. Review the migration files in that release and complete the

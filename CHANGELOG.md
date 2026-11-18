@@ -8,6 +8,7 @@ release says when it does.
 
 ## [Unreleased]
 
+- Added scripts for pulling checkout updates and restarting SignuDoc services.
 - Fixed release directory listing and checkout ownership for Debian builds.
 - Ignore generated production release directories in the checkout.
 - Restricted PDF font tracing to the required assets.
