@@ -12,6 +12,9 @@ if (( EUID != 0 )); then
   fail 'run as root on a new Debian 13 VM.'
 fi
 
+getent passwd signudoc-deploy >/dev/null && getent group signudoc-deploy >/dev/null ||
+  fail 'create the signudoc-deploy user and group that own the checkout before running this script.'
+
 if [[ ! -r /etc/os-release ]]; then
   fail 'cannot identify operating system.'
 fi
@@ -90,7 +93,8 @@ if ! getent passwd signudoc-retention >/dev/null; then
 fi
 
 install -d -o root -g root -m 0700 /etc/signudoc
-install -d -o root -g signudoc -m 0751 /opt/signudoc /opt/signudoc/releases
+install -d -o signudoc-deploy -g signudoc-deploy -m 0755 /opt/signudoc
+install -d -o root -g signudoc -m 0755 /opt/signudoc/releases
 install -d -o root -g signudoc -m 0750 /var/lib/signudoc
 install -d -o signudoc -g signudoc -m 0750 /var/lib/signudoc/documents
 install -d -o signudoc -g signudoc -m 0750 /var/cache/signudoc

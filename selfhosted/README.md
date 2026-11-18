@@ -35,8 +35,9 @@ client-IP trust boundary and needs a separate review.
 
 ## Install packages and accounts
 
-Review `scripts/install-prerequisites.sh`, then run it only on a new Debian 13
-VM:
+Create the `signudoc-deploy` user and its matching group for the checkout
+before running the prerequisites. Review `scripts/install-prerequisites.sh`,
+then run it only on a new Debian 13 VM:
 
 ```sh
 sudo bash selfhosted/scripts/install-prerequisites.sh
@@ -210,9 +211,14 @@ these commands.
 protected environment file, and the accounts/directories from the prerequisite
 script. It archives `HEAD`, installs from `package-lock.json`, and builds as
 `signudoc-build`, not root. It keeps releases under `/opt/signudoc/releases`
-with traversal access for the build account; completed releases remain
-restricted to root and the `signudoc` group. Deployment repairs the parent
-directory permissions from older installations before building. It switches
+with listing and traversal access for the build account; completed releases
+remain restricted to root and the `signudoc` group. Deployment repairs the
+two parent directory permissions from older installations before building.
+`/opt/signudoc` belongs to `signudoc-deploy:signudoc-deploy`; its owner can
+replace entries in that directory, including the `current` symlink and
+`releases` directory. Treat that account as trusted for deployments and limit
+access to it. The releases directory itself belongs to root, so the build
+account cannot create or replace releases. The script switches
 `/opt/signudoc/current` only after a controlled database migration.
 
 Run it from the repository root:

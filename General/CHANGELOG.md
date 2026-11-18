@@ -1,5 +1,6 @@
 # Changelog
 
+- Fixed release directory listing and checkout ownership for Debian builds.
 - Ignore generated production release directories in the checkout.
 - Restricted PDF font tracing to the required assets.
 - Fixed build account traversal of the deployment release directories.

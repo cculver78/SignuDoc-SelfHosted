@@ -43,6 +43,7 @@ for command_name in runuser systemctl systemd-run tar; do
   command -v "$command_name" >/dev/null || fail "required command not found: $command_name."
 done
 id signudoc >/dev/null 2>&1 || fail 'the signudoc service account is missing; run install-prerequisites.sh first.'
+getent passwd signudoc-deploy >/dev/null && getent group signudoc-deploy >/dev/null || fail 'the signudoc-deploy user or group is missing.'
 id signudoc-build >/dev/null 2>&1 || fail 'the signudoc-build account is missing; run install-prerequisites.sh first.'
 id signudoc-retention >/dev/null 2>&1 || fail 'the signudoc-retention account is missing; run install-prerequisites.sh first.'
 [[ -f "$ENV_FILE" && ! -L "$ENV_FILE" ]] || fail "$ENV_FILE is missing or is a symlink."
@@ -60,7 +61,8 @@ if [[ ! -L "$CURRENT_LINK" ]]; then
   unset setup_token
 fi
 
-install -d -o root -g signudoc -m 0751 "$APP_ROOT" "$RELEASES_DIR"
+install -d -o signudoc-deploy -g signudoc-deploy -m 0755 "$APP_ROOT"
+install -d -o root -g signudoc -m 0755 "$RELEASES_DIR"
 build_dir="$(mktemp -d "$RELEASES_DIR/.build.XXXXXX")"
 cleanup_build() {
   if [[ -n "${build_dir:-}" && -d "$build_dir" ]]; then
